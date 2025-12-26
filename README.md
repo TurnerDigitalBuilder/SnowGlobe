@@ -12,7 +12,7 @@ A mobile-friendly snow globe mini-game. Open `index.html` in a modern browser to
 ## Site flow
 1. The overlay card introduces the game and asks to start or enable tilt.
 2. Once running, the HUD shows score, timer, level, remaining stars, and bonus multiplier.
-3. Controls sit alongside the stats on wide screens and stack for smaller devices.
+3. Controls sit alongside the stats on wide screens; on phones they float in opposite top corners to keep the globe visible.
 4. The on-screen joystick stays anchored in the lower-left corner for easy thumb reach.
 5. Game-over or pause states bring back the overlay with contextual messaging.
 
