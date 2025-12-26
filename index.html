@@ -607,18 +607,90 @@
       // ---------- Decor ----------
       function initDecor(){
         decor = [];
-        const n = 7;
+
+        // Evergreen ring
+        const n = 6;
         for(let i=0;i<n;i++){
-          const a = Math.random() * TAU;
-          const rr = (0.20 + Math.random() * 0.55) * (groundR - 0.12);
-          const x = Math.cos(a) * rr;
-          const z = Math.sin(a) * rr;
+          const a = (i / n) * TAU + Math.random() * 0.4;
+          const rr = 0.50 + Math.random() * 0.18;
+          const x = Math.cos(a) * rr * groundR;
+          const z = Math.sin(a) * rr * groundR;
           decor.push({
+            type: "tree",
             x, z,
-            y: groundY + 0.015,
-            h: 0.12 + Math.random() * 0.10,
-            w: 0.06 + Math.random() * 0.05,
+            y: groundY + 0.01,
+            h: 0.16 + Math.random() * 0.07,
+            w: 0.08 + Math.random() * 0.04,
             phase: Math.random() * TAU
+          });
+        }
+
+        // Cozy houses
+        const housePalette = [
+          "#f0e6d6",
+          "#d2e1ff",
+          "#f6d6e8",
+          "#d8f3d1"
+        ];
+        const housePositions = [
+          { a: 0.12, r: 0.30 },
+          { a: 1.2,  r: 0.34 },
+          { a: 2.1,  r: 0.28 },
+          { a: -1.2, r: 0.33 }
+        ];
+        for(const p of housePositions){
+          const x = Math.cos(p.a) * p.r * groundR;
+          const z = Math.sin(p.a) * p.r * groundR;
+          decor.push({
+            type: "house",
+            x, z,
+            y: groundY + 0.005,
+            w: 0.18,
+            d: 0.16,
+            h: 0.12,
+            roof: 0.08,
+            color: housePalette[Math.floor(Math.random() * housePalette.length)]
+          });
+        }
+
+        // Town square: central Christmas tree + gifts
+        decor.push({
+          type: "grandTree",
+          x: 0,
+          z: 0,
+          y: groundY + 0.01,
+          h: 0.34,
+          w: 0.16,
+          phase: Math.random() * TAU
+        });
+
+        const gifts = [
+          { x: 0.07, z: 0.02, c: "#ffb4c2" },
+          { x: -0.06, z: -0.03, c: "#a8e3ff" },
+          { x: 0.02, z: -0.08, c: "#ffe28a" }
+        ];
+        for(const g of gifts){
+          decor.push({
+            type: "gift",
+            x: g.x,
+            z: g.z,
+            y: groundY + 0.002,
+            w: 0.05,
+            h: 0.04,
+            color: g.c
+          });
+        }
+
+        // Lantern posts
+        const lampA = [0.55, -0.65];
+        for(const a of lampA){
+          const x = Math.cos(a) * 0.52 * groundR;
+          const z = Math.sin(a) * 0.52 * groundR;
+          decor.push({
+            type: "lamp",
+            x, z,
+            y: groundY + 0.01,
+            h: 0.18
           });
         }
       }
@@ -1417,35 +1489,194 @@
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // Decor (tiny trees)
+        // Decor (winter town)
         for(const d of decor){
-          const bob = Math.sin(simT * 1.2 + d.phase) * 0.004;
-          const y = d.y + bob;
-          const x = d.x, z = d.z;
+          const bob = d.phase ? Math.sin(simT * 1.2 + d.phase) * 0.004 : 0;
+          const baseY = d.y + bob;
+          const baseX = d.x, baseZ = d.z;
 
-          // base point
-          projectPoint(x, y, z, cosY, sinY, cosP, sinP, camOffX, camOffY);
-          const baseX = px, baseY = py, scale = ps;
+          const proj = (x, y, z) => {
+            projectPoint(x, y, z, cosY, sinY, cosP, sinP, camOffX, camOffY);
+            return { x: px, y: py, s: ps };
+          };
 
-          // tip point
-          projectPoint(x, y + d.h, z, cosY, sinY, cosP, sinP, camOffX, camOffY);
-          const tipX = px, tipY = py;
+          if(d.type === "tree"){
+            const base = proj(baseX, baseY, baseZ);
+            const tip  = proj(baseX, baseY + d.h, baseZ);
+            const w = d.w * base.s * 1.2;
 
-          const w = d.w * scale * 1.2;
+            ctx.globalAlpha = 0.90;
+            ctx.beginPath();
+            ctx.moveTo(base.x - w, base.y);
+            ctx.lineTo(base.x + w, base.y);
+            ctx.lineTo(tip.x, tip.y);
+            ctx.closePath();
+            ctx.fillStyle = "rgba(90, 200, 140, .24)";
+            ctx.fill();
 
-          ctx.globalAlpha = 0.90;
-          ctx.beginPath();
-          ctx.moveTo(baseX - w, baseY);
-          ctx.lineTo(baseX + w, baseY);
-          ctx.lineTo(tipX, tipY);
-          ctx.closePath();
-          ctx.fillStyle = "rgba(90, 200, 140, .22)";
-          ctx.fill();
+            ctx.globalAlpha = 0.40;
+            ctx.strokeStyle = "rgba(255,255,255,.12)";
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
 
-          ctx.globalAlpha = 0.40;
-          ctx.strokeStyle = "rgba(255,255,255,.10)";
-          ctx.stroke();
-          ctx.globalAlpha = 1;
+          if(d.type === "grandTree"){
+            const base = proj(baseX, baseY, baseZ);
+            const tip  = proj(baseX, baseY + d.h, baseZ);
+            const tierCount = 3;
+            for(let i=0;i<tierCount;i++){
+              const t = 1 - i / tierCount;
+              const tierH = d.h * (0.28 + 0.18 * (tierCount - i));
+              const y0 = baseY + d.h * (i * 0.22);
+              const tierBase = proj(baseX, y0, baseZ);
+              const tierTip  = proj(baseX, y0 + tierH * 0.35, baseZ);
+              const w = d.w * t * tierBase.s * 1.6;
+
+              ctx.globalAlpha = 0.95;
+              ctx.beginPath();
+              ctx.moveTo(tierBase.x - w, tierBase.y);
+              ctx.lineTo(tierBase.x + w, tierBase.y);
+              ctx.lineTo(tierTip.x, tierTip.y);
+              ctx.closePath();
+              ctx.fillStyle = "rgba(60, 180, 130, .28)";
+              ctx.fill();
+            }
+
+            // ornaments
+            const lightCount = 14;
+            for(let i=0;i<lightCount;i++){
+              const a = (i / lightCount) * TAU + simT * 0.5;
+              const r = d.w * 0.6;
+              const y = baseY + d.h * (0.12 + 0.75 * (i / lightCount));
+              const x = baseX + Math.cos(a) * r;
+              const z = baseZ + Math.sin(a) * r;
+              const p = proj(x, y, z);
+              const rad = 4 * p.s;
+              ctx.globalAlpha = 0.75;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, rad, 0, TAU);
+              ctx.fillStyle = (i % 2 === 0) ? "#ffd089" : "#9ad0ff";
+              ctx.fill();
+            }
+
+            // star
+            ctx.save();
+            ctx.translate(tip.x, tip.y - 4);
+            ctx.rotate(simT * 0.8);
+            const starR = d.w * tip.s * 10;
+            ctx.beginPath();
+            for(let i=0;i<10;i++){
+              const a = i * Math.PI / 5;
+              const rr = (i % 2 === 0) ? starR : starR * 0.5;
+              ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+            }
+            ctx.closePath();
+            ctx.fillStyle = "rgba(255, 240, 150, .9)";
+            ctx.fill();
+            ctx.restore();
+            ctx.globalAlpha = 1;
+          }
+
+          if(d.type === "gift"){
+            const body = proj(baseX, baseY + d.h, baseZ);
+            const base = proj(baseX, baseY, baseZ);
+            const w = d.w * base.s * 0.8;
+            const h = (body.y - base.y);
+            ctx.globalAlpha = 0.92;
+            ctx.fillStyle = d.color;
+            ctx.fillRect(base.x - w*0.7, base.y - h, w*1.4, h);
+            ctx.fillStyle = "rgba(255,255,255,.6)";
+            ctx.fillRect(base.x - w*0.08, base.y - h, w*0.16, h);
+            ctx.fillRect(base.x - w*0.7, base.y - h*0.65, w*1.4, h*0.16);
+            ctx.globalAlpha = 1;
+          }
+
+          if(d.type === "house"){
+            const hw = d.w * 0.5, hd = d.d * 0.5;
+            const corners = {
+              fl: proj(baseX - hw, baseY, baseZ + hd),
+              fr: proj(baseX + hw, baseY, baseZ + hd),
+              bl: proj(baseX - hw, baseY, baseZ - hd),
+              br: proj(baseX + hw, baseY, baseZ - hd),
+              flt: proj(baseX - hw, baseY + d.h, baseZ + hd),
+              frt: proj(baseX + hw, baseY + d.h, baseZ + hd),
+              blt: proj(baseX - hw, baseY + d.h, baseZ - hd),
+              brt: proj(baseX + hw, baseY + d.h, baseZ - hd)
+            };
+
+            ctx.globalAlpha = 0.95;
+            ctx.beginPath();
+            ctx.moveTo(corners.fl.x, corners.fl.y);
+            ctx.lineTo(corners.fr.x, corners.fr.y);
+            ctx.lineTo(corners.frt.x, corners.frt.y);
+            ctx.lineTo(corners.flt.x, corners.flt.y);
+            ctx.closePath();
+            ctx.fillStyle = d.color;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(corners.fr.x, corners.fr.y);
+            ctx.lineTo(corners.br.x, corners.br.y);
+            ctx.lineTo(corners.brt.x, corners.brt.y);
+            ctx.lineTo(corners.frt.x, corners.frt.y);
+            ctx.closePath();
+            ctx.fillStyle = "rgba(0,0,0,.10)";
+            ctx.fill();
+
+            const roofH = d.roof;
+            const roofRidge = proj(baseX, baseY + d.h + roofH, baseZ);
+            ctx.beginPath();
+            ctx.moveTo(corners.flt.x, corners.flt.y);
+            ctx.lineTo(corners.frt.x, corners.frt.y);
+            ctx.lineTo(roofRidge.x, roofRidge.y);
+            ctx.closePath();
+            ctx.fillStyle = "rgba(160,120,90,.65)";
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(corners.brt.x, corners.brt.y);
+            ctx.lineTo(corners.frt.x, corners.frt.y);
+            ctx.lineTo(roofRidge.x, roofRidge.y);
+            ctx.closePath();
+            ctx.fillStyle = "rgba(120,80,60,.50)";
+            ctx.fill();
+
+            // Warm windows
+            const win = (cx, cz) => {
+              const p1 = proj(baseX + cx, baseY + d.h*0.35, baseZ + cz);
+              const p2 = proj(baseX + cx + 0.04, baseY + d.h*0.35, baseZ + cz);
+              const height = 12 * p1.s;
+              const width  = Math.max(10, Math.abs(p2.x - p1.x));
+              ctx.fillStyle = "rgba(255, 220, 150, .7)";
+              ctx.fillRect(p1.x, p1.y - height, width, height);
+            };
+            win(-0.05, hd - 0.04);
+            win(0.05, hd - 0.04);
+            ctx.globalAlpha = 1;
+          }
+
+          if(d.type === "lamp"){
+            const top = proj(baseX, baseY + d.h, baseZ);
+            const bottom = proj(baseX, baseY, baseZ);
+            ctx.globalAlpha = 0.85;
+            ctx.strokeStyle = "rgba(255,255,255,.35)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(top.x, top.y);
+            ctx.lineTo(bottom.x, bottom.y);
+            ctx.stroke();
+
+            ctx.globalAlpha = 0.75;
+            const glowR = 12 * top.s;
+            const g = ctx.createRadialGradient(top.x, top.y, 0, top.x, top.y, glowR*2.2);
+            g.addColorStop(0, "rgba(255, 235, 190, .8)");
+            g.addColorStop(1, "rgba(255, 235, 190, 0)");
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(top.x, top.y, glowR*2, 0, TAU);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          }
         }
 
         // Draw items + player with simple depth ordering
