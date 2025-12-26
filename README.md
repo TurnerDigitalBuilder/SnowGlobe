@@ -17,4 +17,4 @@ A mobile-friendly snow globe mini-game. Open `index.html` in a modern browser to
 5. Game-over or pause states bring back the overlay with contextual messaging.
 
 ## Mobile readiness
-The layout responds to narrow screens by stacking panels, widening touch targets (44px+), and centering overlay actions. Safe-area insets are respected for notched devices.
+The layout responds to narrow screens by stacking panels, widening touch targets (44px+), and centering overlay actions. Control buttons compact into an auto-fitting grid so they stay on-screen, and safe-area insets are respected for notched devices.
