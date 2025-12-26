@@ -4,7 +4,7 @@ A mobile-friendly snow globe mini-game. Open `index.html` in a modern browser to
 
 ## Controls and tools
 - **Tilt**: Request device-sensor access to steer by tilting your phone.
-- **Joystick**: On-screen joystick for touch and desktop dragging; always available.
+- **Keyboard**: Arrow keys or WASD now steer the snowball when tilt is unavailable.
 - **Shake**: Button or quick device shake to trigger a blizzard bonus.
 - **Pause / Restart**: Manage the game state without leaving the page.
 - **Sound toggle**: Turn audio feedback on or off.
@@ -13,7 +13,7 @@ A mobile-friendly snow globe mini-game. Open `index.html` in a modern browser to
 1. The overlay card introduces the game and asks to start or enable tilt.
 2. Once running, the HUD shows score, timer, level, remaining stars, and bonus multiplier.
 3. Stats pin to the upper-left corner while the control panel hugs the lower-right, leaving the globe clear in the center.
-4. The on-screen joystick stays anchored in the lower-left corner for easy thumb reach.
+4. Keyboard input replaces the on-screen joystick, keeping the screen clear while remaining desktop-friendly.
 5. Game-over or pause states bring back the overlay with contextual messaging.
 
 ## Mobile readiness

@@ -144,37 +144,6 @@
       transform: translateX(-50%) translateY(0);
     }
 
-    /* Joystick */
-    #joystick{
-      position: absolute;
-      left: calc(var(--pad) + env(safe-area-inset-left));
-      bottom: calc(var(--pad) + env(safe-area-inset-bottom));
-      width: 140px;
-      height: 140px;
-      border-radius: 50%;
-      background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.14);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      box-shadow: 0 14px 40px rgba(0,0,0,.22);
-      pointer-events: auto;
-      touch-action: none;
-      user-select: none;
-      display: grid;
-      place-items: center;
-    }
-    #stick{
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: rgba(255,255,255,.18);
-      border: 1px solid rgba(255,255,255,.25);
-      box-shadow: 0 12px 26px rgba(0,0,0,.30);
-      transform: translate(var(--x, 0px), var(--y, 0px));
-      transition: transform .06s linear;
-      pointer-events: none;
-    }
-
     /* Overlay (start/pause/gameover) */
     #overlay{
       position: absolute;
@@ -267,7 +236,6 @@
       .title{ font-size: 19px; }
       .body{ font-size: 13px; }
       .actions{ justify-content: center; width: 100%; }
-      #joystick{ width: 128px; height: 128px; }
       button{
         padding: 9px 9px;
         font-size: 12px;
@@ -278,8 +246,6 @@
     @media (max-width: 420px){
       #controls .btnrow{ grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
       #stats .row{ grid-template-columns: repeat(2, minmax(70px, 1fr)); }
-      #joystick{ width: 120px; height: 120px; }
-      #stick{ width: 50px; height: 50px; }
       .value{ font-size: 17px; }
       button{ padding: 8px 9px; font-size: 11px; }
     }
@@ -314,16 +280,12 @@
 
     <div id="toast" role="status" aria-live="polite"></div>
 
-    <div id="joystick" aria-label="Movement joystick">
-      <div id="stick"></div>
-    </div>
-
     <div id="overlay">
       <div class="card">
         <div class="title" id="ovTitle">Snow Globe Quest</div>
         <div class="body" id="ovBody">
           Roll the red snowball to collect all the stars before the timer runs out.
-          Use <b>Tilt</b> (phone sensors) or the <b>joystick</b>. Tap <b>Shake</b> (or double‑tap the globe)
+          Use <b>Tilt</b> (phone sensors) or the <b>arrow / WASD keys</b>. Tap <b>Shake</b> (or double‑tap the globe)
           to trigger a blizzard bonus.
         </div>
         <div class="actions">
@@ -364,9 +326,6 @@
       const ovSecondary = document.getElementById("ovSecondary");
 
       const toastEl = document.getElementById("toast");
-
-      const joyEl   = document.getElementById("joystick");
-      const stickEl = document.getElementById("stick");
 
       // ---------- Utilities ----------
       const TAU = Math.PI * 2;
@@ -468,11 +427,8 @@
       let sensorX = 0, sensorZ = 0;           // from device orientation
       let sensorActive = false;
 
-      let joyActive = false;
-      let joyPX = 0, joyPY = 0;               // pointer pos in joystick space
-      let joyTX = 0, joyTY = 0;               // target (-1..1)
-      let joyX = 0, joyY = 0;                 // smoothed (-1..1)
-      let joyPointerId = null;
+      let keyLeft = false, keyRight = false, keyUp = false, keyDown = false;
+      let keyX = 0, keyZ = 0;
 
       // View rotation (drag the globe)
       let viewYaw = 0, viewPitch = 0;
@@ -683,7 +639,7 @@
           ovTitle.textContent = "Snow Globe Quest";
           ovBody.innerHTML =
             "Roll the red snowball to collect all the stars before the timer runs out. " +
-            "Use <b>Tilt</b> (phone sensors) or the <b>joystick</b>. " +
+            "Use <b>Tilt</b> (phone sensors) or the <b>arrow / WASD keys</b>. " +
             "Tap <b>Shake</b> (or double‑tap the globe) to trigger a blizzard bonus.";
           ovPrimary.textContent = "Start";
           ovSecondary.textContent = "Enable Tilt";
@@ -832,69 +788,41 @@
         }
       }
 
-      // ---------- Joystick ----------
-      function joyMaxRadius(){
-        // usable radius for stick travel
-        const r = joyEl.clientWidth * 0.5;
-        const s = stickEl.clientWidth * 0.5;
-        return Math.max(10, r - s - 8);
+      // ---------- Keyboard ----------
+      function updateKeyVector(){
+        keyX = (keyRight ? 1 : 0) - (keyLeft ? 1 : 0);
+        keyZ = (keyDown ? 1 : 0) - (keyUp ? 1 : 0);
+
+        const len = Math.hypot(keyX, keyZ);
+        if(len > 1){
+          keyX /= len;
+          keyZ /= len;
+        }
       }
 
-      function setStickVisual(nx, ny){
-        const max = joyMaxRadius();
-        stickEl.style.setProperty("--x", (nx * max).toFixed(1) + "px");
-        stickEl.style.setProperty("--y", (ny * max).toFixed(1) + "px");
-      }
-
-      function setJoyFromPointer(e){
-        const rect = joyEl.getBoundingClientRect();
-        const cx = rect.left + rect.width * 0.5;
-        const cy = rect.top  + rect.height * 0.5;
-
-        const dx = e.clientX - cx;
-        const dy = e.clientY - cy;
-
-        const max = joyMaxRadius();
-        let nx = dx / max;
-        let ny = dy / max;
-
-        const len = Math.hypot(nx, ny);
-        if(len > 1){ nx /= len; ny /= len; }
-
-        joyTX = nx;
-        joyTY = ny;
-        setStickVisual(joyTX, joyTY);
-      }
-
-      joyEl.addEventListener("pointerdown", (e) => {
-        joyActive = true;
-        joyPointerId = e.pointerId;
-        joyEl.setPointerCapture(e.pointerId);
-        setJoyFromPointer(e);
+      function handleKey(e, down){
+        switch(e.code){
+          case "ArrowLeft":
+          case "KeyA":
+            keyLeft = down; break;
+          case "ArrowRight":
+          case "KeyD":
+            keyRight = down; break;
+          case "ArrowUp":
+          case "KeyW":
+            keyUp = down; break;
+          case "ArrowDown":
+          case "KeyS":
+            keyDown = down; break;
+          default:
+            return;
+        }
+        updateKeyVector();
         e.preventDefault();
-      });
-
-      joyEl.addEventListener("pointermove", (e) => {
-        if(!joyActive || e.pointerId !== joyPointerId) return;
-        setJoyFromPointer(e);
-        e.preventDefault();
-      });
-
-      function releaseJoy(){
-        joyActive = false;
-        joyPointerId = null;
-        joyTX = 0; joyTY = 0;
-        setStickVisual(0, 0);
       }
 
-      joyEl.addEventListener("pointerup", (e) => {
-        if(e.pointerId === joyPointerId) releaseJoy();
-        e.preventDefault();
-      });
-
-      joyEl.addEventListener("pointercancel", (e) => {
-        if(e.pointerId === joyPointerId) releaseJoy();
-      });
+      window.addEventListener("keydown", (e) => handleKey(e, true));
+      window.addEventListener("keyup",   (e) => handleKey(e, false));
 
       // ---------- View drag (spin globe) ----------
       canvas.addEventListener("pointerdown", (e) => {
@@ -1080,13 +1008,9 @@
           viewPitchVel *= damp;
         }
 
-        // joystick smoothing
-        joyX = lerp(joyX, joyTX, 1 - Math.exp(-dt * 16));
-        joyY = lerp(joyY, joyTY, 1 - Math.exp(-dt * 16));
-
         // choose control source:
-        const targetX = (joyActive || !sensorActive) ? joyX : sensorX;
-        const targetZ = (joyActive || !sensorActive) ? joyY : sensorZ;
+        const targetX = sensorActive ? sensorX : keyX;
+        const targetZ = sensorActive ? sensorZ : keyZ;
 
         // control smoothing
         tiltX = lerp(tiltX, targetX, 1 - Math.exp(-dt * 10));
