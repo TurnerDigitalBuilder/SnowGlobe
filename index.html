@@ -1,0 +1,1677 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+  />
+  <title>Snow Globe Quest</title>
+  <style>
+    :root{
+      --ui-bg: rgba(0,0,0,.38);
+      --ui-br: rgba(255,255,255,.14);
+      --ui-tx: rgba(255,255,255,.92);
+      --ui-tx-dim: rgba(255,255,255,.72);
+      --pad: 12px;
+      --r: 16px;
+    }
+    *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body{
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #0a1022;
+      color: var(--ui-tx);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    #app{
+      position: fixed;
+      inset: 0;
+    }
+    canvas{
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none; /* important for mobile dragging */
+    }
+
+    /* HUD */
+    #hud{
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      padding: calc(env(safe-area-inset-top) + var(--pad)) var(--pad) var(--pad) var(--pad);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .panel{
+      pointer-events: auto;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-br);
+      border-radius: var(--r);
+      padding: 10px 12px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      max-width: calc(100vw - 2*var(--pad));
+    }
+    #stats .row{
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: baseline;
+    }
+    .stat{
+      display: grid;
+      gap: 2px;
+      min-width: 70px;
+    }
+    .label{
+      font-size: 11px;
+      letter-spacing: .02em;
+      color: var(--ui-tx-dim);
+    }
+    .value{
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    #controls{
+      display: grid;
+      gap: 8px;
+    }
+    .btnrow{
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    button{
+      appearance: none;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.10);
+      color: var(--ui-tx);
+      padding: 9px 12px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    button:active{ transform: translateY(1px); }
+    button.primary{
+      background: rgba(255,255,255,.18);
+      border-color: rgba(255,255,255,.28);
+    }
+
+    /* Toast */
+    #toast{
+      position: absolute;
+      left: 50%;
+      top: calc(env(safe-area-inset-top) + 70px);
+      transform: translateX(-50%);
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.40);
+      border: 1px solid rgba(255,255,255,.16);
+      color: rgba(255,255,255,.95);
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: .02em;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 12px 30px rgba(0,0,0,.22);
+    }
+    #toast.show{
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Joystick */
+    #joystick{
+      position: absolute;
+      left: calc(var(--pad) + env(safe-area-inset-left));
+      bottom: calc(var(--pad) + env(safe-area-inset-bottom));
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 14px 40px rgba(0,0,0,.22);
+      pointer-events: auto;
+      touch-action: none;
+      user-select: none;
+      display: grid;
+      place-items: center;
+    }
+    #stick{
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.18);
+      border: 1px solid rgba(255,255,255,.25);
+      box-shadow: 0 12px 26px rgba(0,0,0,.30);
+      transform: translate(var(--x, 0px), var(--y, 0px));
+      transition: transform .06s linear;
+      pointer-events: none;
+    }
+    .joyLabel{
+      position: absolute;
+      bottom: 10px;
+      font-size: 11px;
+      color: rgba(255,255,255,.75);
+      font-weight: 700;
+      letter-spacing: .02em;
+      pointer-events: none;
+    }
+
+    /* Overlay (start/pause/gameover) */
+    #overlay{
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 18px) 16px;
+      background: radial-gradient(1200px 900px at 50% 20%, rgba(255,255,255,.10), rgba(0,0,0,.55));
+      pointer-events: auto;
+    }
+    #overlay.hidden{ display: none; }
+    .card{
+      width: min(560px, 94vw);
+      border-radius: 18px;
+      padding: 16px 16px 14px 16px;
+      background: rgba(0,0,0,.55);
+      border: 1px solid rgba(255,255,255,.18);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 20px 70px rgba(0,0,0,.45);
+    }
+    .title{
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: .01em;
+      margin-bottom: 8px;
+    }
+    .body{
+      color: rgba(255,255,255,.85);
+      line-height: 1.45;
+      font-size: 14px;
+      margin-bottom: 14px;
+    }
+    .actions{
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      margin-bottom: 10px;
+    }
+    .fineprint{
+      font-size: 12px;
+      color: rgba(255,255,255,.70);
+    }
+
+    @media (max-width: 420px){
+      #joystick{ width: 120px; height: 120px; }
+      #stick{ width: 50px; height: 50px; }
+      .value{ font-size: 17px; }
+      button{ padding: 9px 11px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <canvas id="c" aria-label="Snow globe game"></canvas>
+
+    <div id="hud" aria-hidden="false">
+      <div id="stats" class="panel">
+        <div class="row">
+          <div class="stat"><div class="label">Score</div><div id="score" class="value">0</div></div>
+          <div class="stat"><div class="label">Time</div><div id="time" class="value">60</div></div>
+          <div class="stat"><div class="label">Level</div><div id="level" class="value">1</div></div>
+          <div class="stat"><div class="label">Left</div><div id="left" class="value">0</div></div>
+          <div class="stat"><div class="label">Bonus</div><div id="bonus" class="value">x1</div></div>
+        </div>
+      </div>
+
+      <div id="controls" class="panel">
+        <div class="btnrow">
+          <button id="btnPause" class="btn">Pause</button>
+          <button id="btnShake" class="btn">Shake</button>
+          <button id="btnTilt" class="btn">Tilt</button>
+          <button id="btnMute" class="btn">Sound: On</button>
+          <button id="btnRestart" class="btn">Restart</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <div id="joystick" aria-label="Movement joystick">
+      <div id="stick"></div>
+      <div class="joyLabel">Move</div>
+    </div>
+
+    <div id="overlay">
+      <div class="card">
+        <div class="title" id="ovTitle">Snow Globe Quest</div>
+        <div class="body" id="ovBody">
+          Roll the red snowball to collect all the stars before the timer runs out.
+          Use <b>Tilt</b> (phone sensors) or the <b>joystick</b>. Tap <b>Shake</b> (or double‑tap the globe)
+          to trigger a blizzard bonus.
+        </div>
+        <div class="actions">
+          <button id="ovPrimary" class="primary">Start</button>
+          <button id="ovSecondary">Enable Tilt</button>
+        </div>
+        <div class="fineprint" id="ovFine">
+          Tip: Drag the globe to spin the view. (Controls stay relative to the screen.)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      // ---------- DOM ----------
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+
+      const scoreEl = document.getElementById("score");
+      const timeEl  = document.getElementById("time");
+      const levelEl = document.getElementById("level");
+      const leftEl  = document.getElementById("left");
+      const bonusEl = document.getElementById("bonus");
+
+      const btnPause   = document.getElementById("btnPause");
+      const btnShake   = document.getElementById("btnShake");
+      const btnTilt    = document.getElementById("btnTilt");
+      const btnMute    = document.getElementById("btnMute");
+      const btnRestart = document.getElementById("btnRestart");
+
+      const overlay = document.getElementById("overlay");
+      const ovTitle = document.getElementById("ovTitle");
+      const ovBody  = document.getElementById("ovBody");
+      const ovPrimary   = document.getElementById("ovPrimary");
+      const ovSecondary = document.getElementById("ovSecondary");
+
+      const toastEl = document.getElementById("toast");
+
+      const joyEl   = document.getElementById("joystick");
+      const stickEl = document.getElementById("stick");
+
+      // ---------- Utilities ----------
+      const TAU = Math.PI * 2;
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      const lerp = (a, b, t) => a + (b - a) * t;
+
+      function showToast(text, seconds = 1.2){
+        toastEl.textContent = text;
+        toastEl.classList.add("show");
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => toastEl.classList.remove("show"), seconds * 1000);
+      }
+
+      // ---------- Reduced motion ----------
+      const reducedMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+      // ---------- Canvas sizing / layout ----------
+      let W = 0, H = 0, DPR = 1;
+      let cx = 0, cy = 0, R = 180; // globe center + radius (screen px)
+
+      function resize(){
+        DPR = Math.min(window.devicePixelRatio || 1, 2);
+        W = Math.max(1, window.innerWidth  | 0);
+        H = Math.max(1, window.innerHeight | 0);
+        canvas.width  = (W * DPR) | 0;
+        canvas.height = (H * DPR) | 0;
+        canvas.style.width = W + "px";
+        canvas.style.height = H + "px";
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+        R = Math.min(W, H) * (W < 520 ? 0.35 : 0.36);
+        cx = W * 0.5;
+        cy = H * 0.42;
+
+        rebuildBackdrop();
+        initSnow(true);
+        initDecor();
+      }
+      window.addEventListener("resize", resize, { passive: true });
+
+      // ---------- Backdrop cache ----------
+      let backdropCanvas = document.createElement("canvas");
+      let backdropCtx = backdropCanvas.getContext("2d", { alpha: false });
+      function rebuildBackdrop(){
+        backdropCanvas.width  = W;
+        backdropCanvas.height = H;
+
+        const g = backdropCtx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, "#08102a");
+        g.addColorStop(0.55, "#070b16");
+        g.addColorStop(1, "#050712");
+        backdropCtx.fillStyle = g;
+        backdropCtx.fillRect(0, 0, W, H);
+
+        // Soft bokeh "snowy night" dots
+        const n = reducedMotion ? 40 : 70;
+        for(let i=0;i<n;i++){
+          const x = Math.random() * W;
+          const y = Math.random() * H;
+          const r = 18 + Math.random() * 70;
+          const a = 0.02 + Math.random() * 0.06;
+          backdropCtx.globalAlpha = a;
+          backdropCtx.beginPath();
+          backdropCtx.arc(x, y, r, 0, TAU);
+          backdropCtx.fillStyle = "white";
+          backdropCtx.fill();
+        }
+        backdropCtx.globalAlpha = 1;
+      }
+
+      // ---------- Game / world constants ----------
+      const sphereR  = 1.0;
+      const groundY  = -0.56;
+      const groundR  = 0.78;
+
+      const playerR  = 0.07;
+      const itemR    = 0.05;
+
+      // Camera / projection
+      const camZ  = 3.2;
+      const focal = 1.8;
+
+      // ---------- State ----------
+      let state = "start"; // start | running | paused | gameover
+      let score = 0;
+      let level = 1;
+      let timeLeft = 60;
+      let itemsLeft = 0;
+
+      // Bonus (from shake)
+      let bonusTime = 0;    // seconds remaining
+      let bonusMult = 1;    // 1 or 2
+
+      // Simulation time
+      let simT = 0;
+
+      // Controls
+      let tiltX = 0, tiltZ = 0;               // smoothed control (-1..1)
+      let sensorX = 0, sensorZ = 0;           // from device orientation
+      let sensorActive = false;
+
+      let joyActive = false;
+      let joyPX = 0, joyPY = 0;               // pointer pos in joystick space
+      let joyTX = 0, joyTY = 0;               // target (-1..1)
+      let joyX = 0, joyY = 0;                 // smoothed (-1..1)
+      let joyPointerId = null;
+
+      // View rotation (drag the globe)
+      let viewYaw = 0, viewPitch = 0;
+      let viewYawVel = 0, viewPitchVel = 0;
+      let viewDragging = false;
+      let viewPointerId = null;
+      let lastViewX = 0, lastViewY = 0, lastViewTime = 0;
+
+      // Player
+      const player = { x: 0, z: 0, vx: 0, vz: 0 };
+
+      // Collectibles
+      let items = [];
+
+      // Decor (tiny trees etc)
+      let decor = [];
+
+      // Snow particles
+      let snow = [];
+      let snowCount = 0;
+      let snowSX = null, snowSY = null, snowSZ = null, snowSS = null;
+
+      // Sparkles
+      let sparks = [];
+
+      // Swirl / blizzard
+      let swirlStrength = 0.0;
+      let blizzard = 0.0;
+      let lastShakeAt = -9999;
+
+      // ---------- Audio ----------
+      const audio = {
+        ctx: null,
+        master: null,
+        muted: false
+      };
+
+      function initAudio(){
+        if(audio.ctx) return;
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(!AC) return;
+        audio.ctx = new AC();
+        audio.master = audio.ctx.createGain();
+        audio.master.gain.value = 0.35;
+        audio.master.connect(audio.ctx.destination);
+      }
+
+      function playTone(freq, dur = 0.12, type = "sine", gain = 0.20){
+        if(audio.muted) return;
+        initAudio();
+        if(!audio.ctx || !audio.master) return;
+
+        const t0 = audio.ctx.currentTime;
+        const o = audio.ctx.createOscillator();
+        const g = audio.ctx.createGain();
+
+        o.type = type;
+        o.frequency.setValueAtTime(freq, t0);
+
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+        o.connect(g);
+        g.connect(audio.master);
+
+        o.start(t0);
+        o.stop(t0 + dur + 0.02);
+      }
+
+      function sfxCollect(){
+        playTone(880, 0.11, "triangle", 0.18);
+        playTone(1320, 0.08, "sine", 0.12);
+      }
+
+      function sfxLevelUp(){
+        playTone(660, 0.12, "triangle", 0.16);
+        setTimeout(() => playTone(990, 0.10, "triangle", 0.16), 70);
+        setTimeout(() => playTone(1320,0.10, "sine", 0.14), 140);
+      }
+
+      function sfxShake(){
+        playTone(220, 0.08, "square", 0.12);
+        setTimeout(() => playTone(330, 0.09, "square", 0.09), 70);
+      }
+
+      // ---------- Snow ----------
+      function randInSphere(){
+        // Rejection sampling in cube; good enough for our counts
+        let x, y, z;
+        do{
+          x = Math.random() * 2 - 1;
+          y = Math.random() * 2 - 1;
+          z = Math.random() * 2 - 1;
+        } while(x*x + y*y + z*z > 1);
+        return { x, y, z };
+      }
+
+      function makeSnowParticle(){
+        const p = randInSphere();
+        return {
+          x: p.x, y: p.y, z: p.z,
+          vx: (Math.random()*2-1) * 0.05,
+          vy: (Math.random()*2-1) * 0.05,
+          vz: (Math.random()*2-1) * 0.05,
+          seed: Math.random() * TAU,
+          size: 0.006 + Math.random() * 0.008
+        };
+      }
+
+      function initSnow(forceRebuild = false){
+        const target = reducedMotion
+          ? 240
+          : Math.round(clamp((W * H) / 1200, 360, 1100));
+
+        if(!forceRebuild && target === snowCount) return;
+
+        snowCount = target;
+        snow = new Array(snowCount);
+        for(let i=0;i<snowCount;i++) snow[i] = makeSnowParticle();
+
+        snowSX = new Float32Array(snowCount);
+        snowSY = new Float32Array(snowCount);
+        snowSZ = new Float32Array(snowCount);
+        snowSS = new Float32Array(snowCount);
+      }
+
+      // ---------- Decor ----------
+      function initDecor(){
+        decor = [];
+        const n = 7;
+        for(let i=0;i<n;i++){
+          const a = Math.random() * TAU;
+          const rr = (0.20 + Math.random() * 0.55) * (groundR - 0.12);
+          const x = Math.cos(a) * rr;
+          const z = Math.sin(a) * rr;
+          decor.push({
+            x, z,
+            y: groundY + 0.015,
+            h: 0.12 + Math.random() * 0.10,
+            w: 0.06 + Math.random() * 0.05,
+            phase: Math.random() * TAU
+          });
+        }
+      }
+
+      // ---------- Items ----------
+      function levelItemCount(lv){
+        return Math.min(18, 6 + lv * 2);
+      }
+
+      function spawnItems(count){
+        items = [];
+        let tries = 0;
+
+        while(items.length < count && tries < 5000){
+          tries++;
+          const rr = Math.sqrt(Math.random()) * (groundR - 0.14);
+          const a  = Math.random() * TAU;
+          const x  = Math.cos(a) * rr;
+          const z  = Math.sin(a) * rr;
+
+          // Not too close to player
+          if((x - player.x)**2 + (z - player.z)**2 < 0.14*0.14) continue;
+
+          // Not too close to other items
+          let ok = true;
+          for(const it of items){
+            const dx = x - it.x, dz = z - it.z;
+            if(dx*dx + dz*dz < 0.12*0.12){ ok = false; break; }
+          }
+          if(!ok) continue;
+
+          items.push({
+            x, z,
+            phase: Math.random() * TAU,
+            spin: Math.random() * TAU,
+            collected: false
+          });
+        }
+
+        itemsLeft = items.length;
+      }
+
+      // ---------- Sparkles ----------
+      function addSparkBurst(x, y, z){
+        const count = reducedMotion ? 10 : 18;
+        for(let i=0;i<count;i++){
+          const a = Math.random() * TAU;
+          const b = (Math.random() * 2 - 1) * 0.8;
+          const sp = 0.65 + Math.random() * 1.25;
+
+          // A "mostly upward" burst
+          const vx = Math.cos(a) * sp * 0.12;
+          const vz = Math.sin(a) * sp * 0.12;
+          const vy = (0.18 + Math.abs(b) * 0.5) * sp * 0.14;
+
+          sparks.push({ x, y, z, vx, vy, vz, life: 0.55 + Math.random() * 0.45 });
+        }
+        if(sparks.length > 280) sparks.length = 280;
+      }
+
+      // ---------- Overlay / state ----------
+      function setOverlay(mode){
+        overlay.classList.remove("hidden");
+
+        if(mode === "start"){
+          ovTitle.textContent = "Snow Globe Quest";
+          ovBody.innerHTML =
+            "Roll the red snowball to collect all the stars before the timer runs out. " +
+            "Use <b>Tilt</b> (phone sensors) or the <b>joystick</b>. " +
+            "Tap <b>Shake</b> (or double‑tap the globe) to trigger a blizzard bonus.";
+          ovPrimary.textContent = "Start";
+          ovSecondary.textContent = "Enable Tilt";
+        } else if(mode === "paused"){
+          ovTitle.textContent = "Paused";
+          ovBody.innerHTML =
+            "Take a breath. Drag the globe to spin the view, then resume when you're ready.";
+          ovPrimary.textContent = "Resume";
+          ovSecondary.textContent = "Restart";
+        } else if(mode === "gameover"){
+          ovTitle.textContent = "Time’s up!";
+          ovBody.innerHTML =
+            `Final score: <b>${score}</b><br/>Reached level: <b>${level}</b>`;
+          ovPrimary.textContent = "Play again";
+          ovSecondary.textContent = "Enable Tilt";
+        }
+      }
+
+      function hideOverlay(){
+        overlay.classList.add("hidden");
+      }
+
+      function setState(next){
+        state = next;
+        btnPause.textContent = (state === "running") ? "Pause" : "Resume";
+      }
+
+      function startGame(){
+        initAudio(); // safe (only creates after gesture)
+        score = 0;
+        level = 1;
+        timeLeft = 60;
+        bonusTime = 0;
+        bonusMult = 1;
+
+        player.x = 0; player.z = 0;
+        player.vx = 0; player.vz = 0;
+
+        spawnItems(levelItemCount(level));
+
+        swirlStrength = 0;
+        blizzard = 0;
+        simT = 0;
+        sparks.length = 0;
+
+        setState("running");
+        hideOverlay();
+        showToast("Collect the stars!");
+      }
+
+      function nextLevel(){
+        level++;
+        const add = 8 + Math.min(8, level);
+        timeLeft = Math.min(65, timeLeft + add);
+
+        spawnItems(levelItemCount(level));
+        swirlStrength = Math.min(6, swirlStrength + 1.1);
+        blizzard = Math.min(1, blizzard + 0.18);
+
+        sfxLevelUp();
+        showToast(`Level ${level}! +${add}s`);
+      }
+
+      function gameOver(){
+        setState("gameover");
+        setOverlay("gameover");
+      }
+
+      // ---------- Sensors ----------
+      function handleOrientation(e){
+        if(e.gamma == null || e.beta == null) return;
+        // gamma: left-right (-90..90), beta: front-back (-180..180)
+        const g = clamp(e.gamma, -45, 45) / 45;
+        const b = clamp(e.beta,  -45, 45) / 45;
+
+        sensorX = g;
+        sensorZ = -b; // invert so "tilt forward" tends to push toward the back of the globe
+        sensorActive = true;
+      }
+
+      let motionActive = false;
+      function handleMotion(e){
+        const now = performance.now();
+        if(now - lastShakeAt < 900) return;
+
+        let ax = 0, ay = 0, az = 0;
+        if(e.acceleration && (e.acceleration.x != null || e.acceleration.y != null || e.acceleration.z != null)){
+          ax = e.acceleration.x || 0;
+          ay = e.acceleration.y || 0;
+          az = e.acceleration.z || 0;
+          const mag = Math.sqrt(ax*ax + ay*ay + az*az);
+          if(mag > 2.8){
+            triggerShake("motion");
+          }
+        } else if(e.accelerationIncludingGravity){
+          ax = e.accelerationIncludingGravity.x || 0;
+          ay = e.accelerationIncludingGravity.y || 0;
+          az = e.accelerationIncludingGravity.z || 0;
+          const mag = Math.sqrt(ax*ax + ay*ay + az*az);
+          const jolt = Math.abs(mag - 9.81);
+          if(jolt > 3.2){
+            triggerShake("motion");
+          }
+        }
+      }
+
+      async function enableSensors(){
+        let ok = false;
+
+        // iOS requires permission calls inside a user gesture
+        try{
+          if(typeof DeviceOrientationEvent !== "undefined"){
+            if(typeof DeviceOrientationEvent.requestPermission === "function"){
+              const res = await DeviceOrientationEvent.requestPermission();
+              if(res === "granted"){
+                window.addEventListener("deviceorientation", handleOrientation, true);
+                ok = true;
+              }
+            } else {
+              window.addEventListener("deviceorientation", handleOrientation, true);
+              ok = true;
+            }
+          }
+        } catch(_){ /* ignore */ }
+
+        try{
+          if(typeof DeviceMotionEvent !== "undefined"){
+            if(typeof DeviceMotionEvent.requestPermission === "function"){
+              const res = await DeviceMotionEvent.requestPermission();
+              if(res === "granted"){
+                window.addEventListener("devicemotion", handleMotion, true);
+                motionActive = true;
+              }
+            } else {
+              window.addEventListener("devicemotion", handleMotion, true);
+              motionActive = true;
+            }
+          }
+        } catch(_){ /* ignore */ }
+
+        if(ok){
+          btnTilt.textContent = "Tilt ✓";
+          showToast("Tilt enabled");
+        } else {
+          showToast("Tilt not available here");
+        }
+      }
+
+      // ---------- Joystick ----------
+      function joyMaxRadius(){
+        // usable radius for stick travel
+        const r = joyEl.clientWidth * 0.5;
+        const s = stickEl.clientWidth * 0.5;
+        return Math.max(10, r - s - 8);
+      }
+
+      function setStickVisual(nx, ny){
+        const max = joyMaxRadius();
+        stickEl.style.setProperty("--x", (nx * max).toFixed(1) + "px");
+        stickEl.style.setProperty("--y", (ny * max).toFixed(1) + "px");
+      }
+
+      function setJoyFromPointer(e){
+        const rect = joyEl.getBoundingClientRect();
+        const cx = rect.left + rect.width * 0.5;
+        const cy = rect.top  + rect.height * 0.5;
+
+        const dx = e.clientX - cx;
+        const dy = e.clientY - cy;
+
+        const max = joyMaxRadius();
+        let nx = dx / max;
+        let ny = dy / max;
+
+        const len = Math.hypot(nx, ny);
+        if(len > 1){ nx /= len; ny /= len; }
+
+        joyTX = nx;
+        joyTY = ny;
+        setStickVisual(joyTX, joyTY);
+      }
+
+      joyEl.addEventListener("pointerdown", (e) => {
+        joyActive = true;
+        joyPointerId = e.pointerId;
+        joyEl.setPointerCapture(e.pointerId);
+        setJoyFromPointer(e);
+        e.preventDefault();
+      });
+
+      joyEl.addEventListener("pointermove", (e) => {
+        if(!joyActive || e.pointerId !== joyPointerId) return;
+        setJoyFromPointer(e);
+        e.preventDefault();
+      });
+
+      function releaseJoy(){
+        joyActive = false;
+        joyPointerId = null;
+        joyTX = 0; joyTY = 0;
+        setStickVisual(0, 0);
+      }
+
+      joyEl.addEventListener("pointerup", (e) => {
+        if(e.pointerId === joyPointerId) releaseJoy();
+        e.preventDefault();
+      });
+
+      joyEl.addEventListener("pointercancel", (e) => {
+        if(e.pointerId === joyPointerId) releaseJoy();
+      });
+
+      // ---------- View drag (spin globe) ----------
+      canvas.addEventListener("pointerdown", (e) => {
+        // ignore if overlay is up
+        if(!overlay.classList.contains("hidden")) return;
+
+        viewDragging = true;
+        viewPointerId = e.pointerId;
+        canvas.setPointerCapture(e.pointerId);
+
+        lastViewX = e.clientX;
+        lastViewY = e.clientY;
+        lastViewTime = performance.now();
+      });
+
+      canvas.addEventListener("pointermove", (e) => {
+        if(!viewDragging || e.pointerId !== viewPointerId) return;
+
+        const now = performance.now();
+        const dt = Math.max(0.001, (now - lastViewTime) / 1000);
+
+        const dx = e.clientX - lastViewX;
+        const dy = e.clientY - lastViewY;
+
+        viewYaw   += dx * 0.005;
+        viewPitch += dy * 0.004;
+
+        viewPitch = clamp(viewPitch, -0.55, 0.55);
+
+        // inertial velocity (rad/s)
+        viewYawVel   = (dx * 0.005) / dt;
+        viewPitchVel = (dy * 0.004) / dt;
+
+        lastViewX = e.clientX;
+        lastViewY = e.clientY;
+        lastViewTime = now;
+      });
+
+      canvas.addEventListener("pointerup", (e) => {
+        if(e.pointerId === viewPointerId){
+          viewDragging = false;
+          viewPointerId = null;
+        }
+      });
+
+      canvas.addEventListener("pointercancel", (e) => {
+        if(e.pointerId === viewPointerId){
+          viewDragging = false;
+          viewPointerId = null;
+        }
+      });
+
+      // Double-tap to shake
+      let lastTap = 0;
+      canvas.addEventListener("pointerup", () => {
+        const now = performance.now();
+        if(now - lastTap < 280){
+          triggerShake("doubletap");
+          lastTap = 0;
+        } else {
+          lastTap = now;
+        }
+      });
+
+      canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+      // ---------- Buttons ----------
+      btnPause.addEventListener("click", () => {
+        if(state === "running"){
+          setState("paused");
+          setOverlay("paused");
+        } else if(state === "paused"){
+          setState("running");
+          hideOverlay();
+        } else if(state === "gameover"){
+          startGame();
+        } else {
+          // from start screen
+          startGame();
+        }
+      });
+
+      btnRestart.addEventListener("click", () => startGame());
+
+      btnShake.addEventListener("click", () => triggerShake("button"));
+
+      btnTilt.addEventListener("click", async () => {
+        await enableSensors();
+      });
+
+      btnMute.addEventListener("click", () => {
+        audio.muted = !audio.muted;
+        btnMute.textContent = audio.muted ? "Sound: Off" : "Sound: On";
+        showToast(audio.muted ? "Sound off" : "Sound on");
+      });
+
+      ovPrimary.addEventListener("click", () => {
+        if(state === "paused"){
+          setState("running");
+          hideOverlay();
+          return;
+        }
+        startGame();
+      });
+
+      ovSecondary.addEventListener("click", async () => {
+        if(state === "paused"){
+          startGame();
+          return;
+        }
+        await enableSensors();
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if(document.hidden && state === "running"){
+          setState("paused");
+          setOverlay("paused");
+        }
+      });
+
+      // ---------- Shake / Blizzard ----------
+      function triggerShake(source = "unknown"){
+        const now = performance.now();
+        if(now - lastShakeAt < 650) return;
+        lastShakeAt = now;
+
+        swirlStrength = Math.min(7, swirlStrength + 3.6);
+        blizzard = Math.min(1, blizzard + 0.85);
+
+        bonusTime = 2.8;
+        bonusMult = 2;
+
+        // tiny view "kick"
+        viewYawVel += (Math.random() * 2 - 1) * 1.2;
+        viewPitchVel += (Math.random() * 2 - 1) * 0.7;
+
+        if(navigator.vibrate) navigator.vibrate(25);
+        sfxShake();
+        showToast("Blizzard! x2", 1.0);
+
+        // optional: puff some sparkles in the center
+        addSparkBurst(0, groundY + 0.18, 0);
+      }
+
+      // ---------- Projection helpers ----------
+      // Global projected values (avoid allocations)
+      let px = 0, py = 0, pz = 0, ps = 0;
+
+      function projectPoint(x, y, z, cosY, sinY, cosP, sinP, camOffX, camOffY){
+        // rotate world by yaw, then pitch (camera stays fixed)
+        let x1 = x * cosY + z * sinY;
+        let z1 = -x * sinY + z * cosY;
+
+        let y1 = y * cosP - z1 * sinP;
+        z1 = y * sinP + z1 * cosP;
+
+        // subtle parallax based on control
+        x1 -= camOffX;
+        y1 -= camOffY;
+
+        const zz = z1 + camZ;
+        const s = (focal / zz) * R;
+
+        px = cx + x1 * s;
+        py = cy - y1 * s;
+        pz = z1;     // rotated depth (for front/back grouping)
+        ps = s;
+      }
+
+      // ---------- Update ----------
+      function update(dt){
+        simT += dt;
+
+        // inertial camera spin
+        if(!viewDragging){
+          viewYaw += viewYawVel * dt;
+          viewPitch += viewPitchVel * dt;
+
+          viewPitch = clamp(viewPitch, -0.55, 0.55);
+
+          const damp = Math.exp(-dt * (reducedMotion ? 7.5 : 5.5));
+          viewYawVel *= damp;
+          viewPitchVel *= damp;
+        }
+
+        // joystick smoothing
+        joyX = lerp(joyX, joyTX, 1 - Math.exp(-dt * 16));
+        joyY = lerp(joyY, joyTY, 1 - Math.exp(-dt * 16));
+
+        // choose control source:
+        const targetX = (joyActive || !sensorActive) ? joyX : sensorX;
+        const targetZ = (joyActive || !sensorActive) ? joyY : sensorZ;
+
+        // control smoothing
+        tiltX = lerp(tiltX, targetX, 1 - Math.exp(-dt * 10));
+        tiltZ = lerp(tiltZ, targetZ, 1 - Math.exp(-dt * 10));
+
+        // bonus timer
+        if(bonusTime > 0){
+          bonusTime -= dt;
+          if(bonusTime <= 0){
+            bonusTime = 0;
+            bonusMult = 1;
+          }
+        }
+
+        // swirl / blizzard decay
+        swirlStrength *= Math.exp(-dt * 1.6);
+        blizzard = Math.max(0, blizzard - dt * (reducedMotion ? 0.45 : 0.32));
+
+        // gameplay only while running
+        if(state === "running"){
+          timeLeft -= dt;
+          if(timeLeft <= 0){
+            timeLeft = 0;
+            gameOver();
+          } else {
+            updatePlayer(dt);
+            updateItems(dt);
+          }
+        }
+
+        updateSnow(dt);
+        updateSparks(dt);
+
+        // HUD
+        scoreEl.textContent = String(score);
+        timeEl.textContent  = String(Math.ceil(timeLeft));
+        levelEl.textContent = String(level);
+        leftEl.textContent  = String(itemsLeft);
+        bonusEl.textContent = "x" + String(bonusMult);
+      }
+
+      function updatePlayer(dt){
+        // Convert screen-relative control into world acceleration that stays consistent even when spinning the view.
+        const cosY = Math.cos(viewYaw), sinY = Math.sin(viewYaw);
+
+        const accel = 1.85;
+        const ax = (tiltX * cosY - tiltZ * sinY) * accel;
+        const az = (tiltX * sinY + tiltZ * cosY) * accel;
+
+        player.vx += ax * dt;
+        player.vz += az * dt;
+
+        // damping
+        const drag = Math.exp(-dt * 2.6);
+        player.vx *= drag;
+        player.vz *= drag;
+
+        // speed clamp
+        const sp = Math.hypot(player.vx, player.vz);
+        const maxSp = 2.6;
+        if(sp > maxSp){
+          const k = maxSp / sp;
+          player.vx *= k;
+          player.vz *= k;
+        }
+
+        player.x += player.vx * dt;
+        player.z += player.vz * dt;
+
+        // Keep inside ground disk
+        const dist = Math.hypot(player.x, player.z);
+        const maxD = groundR - playerR * 1.02;
+        if(dist > maxD){
+          const nx = player.x / dist;
+          const nz = player.z / dist;
+          player.x = nx * maxD;
+          player.z = nz * maxD;
+
+          // bounce
+          const dot = player.vx * nx + player.vz * nz;
+          if(dot > 0){
+            player.vx -= 1.55 * dot * nx;
+            player.vz -= 1.55 * dot * nz;
+          }
+        }
+
+        // Collect items
+        for(const it of items){
+          if(it.collected) continue;
+          const dx = player.x - it.x;
+          const dz = player.z - it.z;
+          const r = playerR + itemR;
+          if(dx*dx + dz*dz < r*r){
+            it.collected = true;
+            itemsLeft--;
+
+            const points = 10 * bonusMult;
+            score += points;
+
+            addSparkBurst(it.x, groundY + 0.08, it.z);
+            if(navigator.vibrate) navigator.vibrate(12);
+            sfxCollect();
+
+            if(itemsLeft <= 0){
+              nextLevel();
+            }
+          }
+        }
+      }
+
+      function updateItems(dt){
+        for(const it of items){
+          if(it.collected) continue;
+          it.spin += dt * (0.9 + level * 0.04);
+        }
+      }
+
+      function updateSnow(dt){
+        const g = 0.55 * (0.8 + 0.5 * blizzard);
+        const swirl = swirlStrength + blizzard * 3.2;
+
+        // subtle wind (screen-relative -> world-relative like player)
+        const cosY = Math.cos(viewYaw), sinY = Math.sin(viewYaw);
+        const windX = (tiltX * cosY - tiltZ * sinY) * 0.30;
+        const windZ = (tiltX * sinY + tiltZ * cosY) * 0.30;
+
+        const sphereLimit = 0.988;
+
+        for(let i=0;i<snowCount;i++){
+          const p = snow[i];
+
+          // forces
+          p.vy -= g * dt;
+          p.vx += windX * dt;
+          p.vz += windZ * dt;
+
+          // swirl around vertical axis
+          p.vx += (-p.z) * swirl * dt;
+          p.vz += ( p.x) * swirl * dt;
+
+          // tiny turbulence
+          const t = simT * 0.65 + p.seed;
+          p.vx += Math.sin(t * 1.7) * 0.015 * dt;
+          p.vz += Math.cos(t * 1.9) * 0.015 * dt;
+
+          // integrate
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.z += p.vz * dt;
+
+          // ground bounce (only if inside ground disk)
+          if(p.y < groundY + 0.015){
+            const r2 = p.x*p.x + p.z*p.z;
+            if(r2 < groundR * groundR){
+              p.y = groundY + 0.015;
+              p.vy = Math.abs(p.vy) * 0.32;
+              p.vx *= 0.85;
+              p.vz *= 0.85;
+
+              // occasional "puff" so flakes don't all settle forever
+              if(Math.random() < 0.0015 + blizzard * 0.003){
+                p.vy += 0.20 + Math.random() * 0.25;
+              }
+            }
+          }
+
+          // keep inside sphere
+          const rr = p.x*p.x + p.y*p.y + p.z*p.z;
+          if(rr > sphereLimit * sphereLimit){
+            const r = Math.sqrt(rr) || 1;
+            const nx = p.x / r, ny = p.y / r, nz = p.z / r;
+
+            const c = sphereLimit / r;
+            p.x *= c; p.y *= c; p.z *= c;
+
+            const dot = p.vx*nx + p.vy*ny + p.vz*nz;
+            p.vx -= 1.6 * dot * nx;
+            p.vy -= 1.6 * dot * ny;
+            p.vz -= 1.6 * dot * nz;
+
+            p.vx *= 0.96; p.vy *= 0.96; p.vz *= 0.96;
+          }
+        }
+      }
+
+      function updateSparks(dt){
+        const sphereLimit = 0.985;
+
+        for(let i=sparks.length - 1; i>=0; i--){
+          const s = sparks[i];
+          s.life -= dt;
+          if(s.life <= 0){
+            sparks.splice(i, 1);
+            continue;
+          }
+
+          s.vy -= 0.85 * dt;
+          s.vx *= Math.exp(-dt * 2.0);
+          s.vy *= Math.exp(-dt * 1.2);
+          s.vz *= Math.exp(-dt * 2.0);
+
+          s.x += s.vx * dt;
+          s.y += s.vy * dt;
+          s.z += s.vz * dt;
+
+          // keep in sphere
+          const rr = s.x*s.x + s.y*s.y + s.z*s.z;
+          if(rr > sphereLimit * sphereLimit){
+            const r = Math.sqrt(rr) || 1;
+            const nx = s.x / r, ny = s.y / r, nz = s.z / r;
+
+            const c = sphereLimit / r;
+            s.x *= c; s.y *= c; s.z *= c;
+
+            const dot = s.vx*nx + s.vy*ny + s.vz*nz;
+            s.vx -= 1.4 * dot * nx;
+            s.vy -= 1.4 * dot * ny;
+            s.vz -= 1.4 * dot * nz;
+          }
+        }
+      }
+
+      // ---------- Render ----------
+      function drawBase(){
+        const baseTop = cy + R * 0.90;
+        const baseW = R * 1.95;
+        const baseH = R * 0.58;
+
+        ctx.save();
+        ctx.translate(cx, baseTop);
+
+        // shadow
+        ctx.globalAlpha = 0.40;
+        ctx.beginPath();
+        ctx.ellipse(0, baseH*0.64, baseW*0.48, baseH*0.22, 0, 0, TAU);
+        ctx.fillStyle = "black";
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // body gradient
+        const g = ctx.createLinearGradient(0, -baseH*0.55, 0, baseH*0.60);
+        g.addColorStop(0,   "#5b2f18");
+        g.addColorStop(0.5, "#3d1e10");
+        g.addColorStop(1,   "#2a120a");
+
+        ctx.fillStyle = g;
+        ctx.strokeStyle = "rgba(255,255,255,.12)";
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        ctx.moveTo(-baseW*0.52, 0);
+        ctx.quadraticCurveTo(-baseW*0.54, baseH*0.60, 0, baseH*0.60);
+        ctx.quadraticCurveTo(baseW*0.54, baseH*0.60, baseW*0.52, 0);
+        ctx.quadraticCurveTo(baseW*0.43, -baseH*0.55, 0, -baseH*0.55);
+        ctx.quadraticCurveTo(-baseW*0.43, -baseH*0.55, -baseW*0.52, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // top lip
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        ctx.ellipse(0, -baseH*0.10, baseW*0.46, baseH*0.18, 0, 0, TAU);
+        ctx.fillStyle = "rgba(255,255,255,.06)";
+        ctx.fill();
+
+        // label hint
+        ctx.globalAlpha = 0.45;
+        ctx.font = `700 ${Math.max(12, R*0.08)|0}px ui-sans-serif, system-ui, -apple-system`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgba(255,255,255,.14)";
+        ctx.fillText("SNOW GLOBE QUEST", 0, baseH*0.16);
+
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      }
+
+      function drawInsideGlobe(cosY, sinY, cosP, sinP){
+        // Clip to globe circle
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, 0, TAU);
+        ctx.clip();
+
+        // inner background gradient
+        const bg = ctx.createLinearGradient(0, cy - R, 0, cy + R);
+        bg.addColorStop(0, "#1a2a4c");
+        bg.addColorStop(0.55, "#0e1730");
+        bg.addColorStop(1, "#0a0e1d");
+        ctx.fillStyle = bg;
+        ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+
+        // faint inner "aurora" wash
+        ctx.globalAlpha = 0.10;
+        ctx.beginPath();
+        ctx.ellipse(cx - R*0.25, cy - R*0.35, R*0.9, R*0.55, -0.6, 0, TAU);
+        ctx.fillStyle = "white";
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // compute camera parallax offsets
+        const camOffX = tiltX * 0.12;
+        const camOffY = tiltZ * 0.08;
+
+        // Project snow to screen buffers (once)
+        for(let i=0;i<snowCount;i++){
+          const p = snow[i];
+          projectPoint(p.x, p.y, p.z, cosY, sinY, cosP, sinP, camOffX, camOffY);
+          snowSX[i] = px;
+          snowSY[i] = py;
+          snowSZ[i] = pz;
+          snowSS[i] = ps;
+        }
+
+        // Back snow (behind)
+        ctx.fillStyle = "#f7fbff";
+        for(let i=0;i<snowCount;i++){
+          if(snowSZ[i] >= 0) continue;
+          const zN = (snowSZ[i] + 1) * 0.5; // 0..1
+          const s  = snowSS[i];
+          const r  = (snow[i].size * s * 3.1) + 0.10;
+          const a  = (0.12 + 0.35 * zN) * (0.70 + 0.55 * blizzard);
+          ctx.globalAlpha = a;
+          ctx.beginPath();
+          ctx.arc(snowSX[i], snowSY[i], r, 0, TAU);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // Ground disk (polygon from projected circle)
+        const steps = 84;
+        ctx.beginPath();
+        for(let i=0;i<=steps;i++){
+          const t = (i / steps) * TAU;
+          const x = Math.cos(t) * groundR;
+          const z = Math.sin(t) * groundR;
+          const y = groundY;
+
+          projectPoint(x, y, z, cosY, sinY, cosP, sinP, camOffX, camOffY);
+          if(i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+
+        // snow ground shading
+        const grd = ctx.createLinearGradient(0, cy - R*0.2, 0, cy + R);
+        grd.addColorStop(0, "rgba(255,255,255,.14)");
+        grd.addColorStop(0.65, "rgba(255,255,255,.06)");
+        grd.addColorStop(1, "rgba(0,0,0,.12)");
+        ctx.fillStyle = grd;
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(255,255,255,.10)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Decor (tiny trees)
+        for(const d of decor){
+          const bob = Math.sin(simT * 1.2 + d.phase) * 0.004;
+          const y = d.y + bob;
+          const x = d.x, z = d.z;
+
+          // base point
+          projectPoint(x, y, z, cosY, sinY, cosP, sinP, camOffX, camOffY);
+          const baseX = px, baseY = py, scale = ps;
+
+          // tip point
+          projectPoint(x, y + d.h, z, cosY, sinY, cosP, sinP, camOffX, camOffY);
+          const tipX = px, tipY = py;
+
+          const w = d.w * scale * 1.2;
+
+          ctx.globalAlpha = 0.90;
+          ctx.beginPath();
+          ctx.moveTo(baseX - w, baseY);
+          ctx.lineTo(baseX + w, baseY);
+          ctx.lineTo(tipX, tipY);
+          ctx.closePath();
+          ctx.fillStyle = "rgba(90, 200, 140, .22)";
+          ctx.fill();
+
+          ctx.globalAlpha = 0.40;
+          ctx.strokeStyle = "rgba(255,255,255,.10)";
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+
+        // Draw items + player with simple depth ordering
+        const drawList = [];
+
+        // items
+        for(const it of items){
+          if(it.collected) continue;
+          // bobbing star
+          const bob = Math.sin(simT * 2.2 + it.phase) * 0.015;
+          drawList.push({ type: "item", x: it.x, y: groundY + 0.045 + bob, z: it.z, spin: it.spin });
+        }
+
+        // player
+        const speed = Math.hypot(player.vx, player.vz);
+        const pBob = Math.sin(simT * 6 + speed * 1.2) * 0.005;
+        drawList.push({ type: "player", x: player.x, y: groundY + playerR*0.45 + pBob, z: player.z });
+
+        // sparks
+        for(const sp of sparks){
+          drawList.push({ type: "spark", x: sp.x, y: sp.y, z: sp.z, life: sp.life });
+        }
+
+        // sort by depth (far to near)
+        drawList.sort((a, b) => a.z - b.z);
+
+        // draw
+        for(const o of drawList){
+          projectPoint(o.x, o.y, o.z, cosY, sinY, cosP, sinP, camOffX, camOffY);
+
+          if(o.type === "item"){
+            const r = itemR * ps * 1.35;
+            const glow = r * 1.9;
+
+            // glow
+            ctx.globalAlpha = 0.12 + 0.10 * blizzard;
+            ctx.beginPath();
+            ctx.arc(px, py, glow, 0, TAU);
+            ctx.fillStyle = "rgba(255, 230, 160, 1)";
+            ctx.fill();
+
+            // star
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(o.spin);
+            ctx.beginPath();
+            for(let i=0;i<10;i++){
+              const a = i * Math.PI / 5;
+              const rr = (i % 2 === 0) ? r : r * 0.45;
+              ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+            }
+            ctx.closePath();
+
+            ctx.globalAlpha = 0.88;
+            ctx.fillStyle = "rgba(255, 215, 120, 1)";
+            ctx.fill();
+
+            ctx.globalAlpha = 0.65;
+            ctx.strokeStyle = "rgba(255,255,255,.75)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.globalAlpha = 1;
+          }
+
+          if(o.type === "player"){
+            const r = playerR * ps * 1.10;
+
+            // shadow on ground
+            projectPoint(o.x, groundY + 0.010, o.z, cosY, sinY, cosP, sinP, camOffX, camOffY);
+            ctx.globalAlpha = 0.22;
+            ctx.beginPath();
+            ctx.ellipse(px, py + r*0.65, r*0.75, r*0.28, 0, 0, TAU);
+            ctx.fillStyle = "black";
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            // ball
+            projectPoint(o.x, o.y, o.z, cosY, sinY, cosP, sinP, camOffX, camOffY);
+            ctx.beginPath();
+            ctx.arc(px, py, r, 0, TAU);
+            ctx.fillStyle = "rgba(255, 90, 90, 1)";
+            ctx.fill();
+
+            // highlight
+            ctx.globalAlpha = 0.32;
+            ctx.beginPath();
+            ctx.arc(px - r*0.35, py - r*0.35, r*0.35, 0, TAU);
+            ctx.fillStyle = "white";
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            // rim
+            ctx.globalAlpha = 0.35;
+            ctx.strokeStyle = "rgba(255,255,255,.65)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(px, py, r, 0, TAU);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+
+          if(o.type === "spark"){
+            const r = 0.012 * ps * (1.0 + 0.8 * blizzard);
+            const a = clamp(o.life, 0, 1);
+
+            ctx.globalAlpha = 0.35 * a;
+            ctx.beginPath();
+            ctx.arc(px, py, r*3.5, 0, TAU);
+            ctx.fillStyle = "rgba(200, 240, 255, 1)";
+            ctx.fill();
+
+            ctx.globalAlpha = 0.85 * a;
+            ctx.beginPath();
+            ctx.arc(px, py, r, 0, TAU);
+            ctx.fillStyle = "white";
+            ctx.fill();
+
+            ctx.globalAlpha = 1;
+          }
+        }
+
+        // Front snow (in front)
+        ctx.fillStyle = "#ffffff";
+        for(let i=0;i<snowCount;i++){
+          if(snowSZ[i] < 0) continue;
+          const zN = (snowSZ[i] + 1) * 0.5; // 0..1
+          const s  = snowSS[i];
+          const r  = (snow[i].size * s * 3.2) + 0.10;
+          const a  = (0.16 + 0.55 * zN) * (0.70 + 0.75 * blizzard);
+          ctx.globalAlpha = a;
+          ctx.beginPath();
+          ctx.arc(snowSX[i], snowSY[i], r, 0, TAU);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // Inner vignette
+        const v = ctx.createRadialGradient(cx, cy, R*0.25, cx, cy, R);
+        v.addColorStop(0, "rgba(0,0,0,0)");
+        v.addColorStop(1, "rgba(0,0,0,.35)");
+        ctx.fillStyle = v;
+        ctx.fillRect(cx - R, cy - R, R*2, R*2);
+
+        ctx.restore();
+      }
+
+      function drawGlass(){
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // outer rim shadow
+        ctx.globalAlpha = 0.22;
+        ctx.beginPath();
+        ctx.arc(0, 0, R * 1.012, 0, TAU);
+        ctx.strokeStyle = "rgba(0,0,0,.55)";
+        ctx.lineWidth = Math.max(1, R * 0.018);
+        ctx.stroke();
+
+        // glass sheen
+        const rg = ctx.createRadialGradient(-R*0.38, -R*0.48, R*0.22, 0, 0, R);
+        rg.addColorStop(0.0, "rgba(255,255,255,.26)");
+        rg.addColorStop(0.35,"rgba(255,255,255,.07)");
+        rg.addColorStop(0.70,"rgba(255,255,255,.03)");
+        rg.addColorStop(1.0, "rgba(255,255,255,.08)");
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = rg;
+        ctx.beginPath();
+        ctx.arc(0, 0, R, 0, TAU);
+        ctx.fill();
+
+        // highlight arc
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.arc(-R*0.12, -R*0.12, R*0.86, -0.22, 0.86);
+        ctx.strokeStyle = "rgba(255,255,255,.12)";
+        ctx.lineWidth = Math.max(1, R * 0.02);
+        ctx.lineCap = "round";
+        ctx.stroke();
+
+        // small glint
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.arc(-R*0.55, -R*0.46, R*0.20, 0, TAU);
+        ctx.fillStyle = "rgba(255,255,255,.15)";
+        ctx.fill();
+
+        // inner rim
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        ctx.arc(0, 0, R*0.995, 0, TAU);
+        ctx.strokeStyle = "rgba(255,255,255,.22)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      }
+
+      function render(){
+        // backdrop
+        ctx.drawImage(backdropCanvas, 0, 0);
+
+        // base first (behind globe rim)
+        drawBase();
+
+        // view trig
+        const cosY = Math.cos(viewYaw), sinY = Math.sin(viewYaw);
+        const cosP = Math.cos(viewPitch), sinP = Math.sin(viewPitch);
+
+        // inside globe
+        drawInsideGlobe(cosY, sinY, cosP, sinP);
+
+        // glass overlay
+        drawGlass();
+
+        // subtle "blizzard" halo around globe
+        if(blizzard > 0.02){
+          ctx.globalAlpha = 0.10 * blizzard;
+          ctx.beginPath();
+          ctx.arc(cx, cy, R*1.08, 0, TAU);
+          ctx.strokeStyle = "white";
+          ctx.lineWidth = R*0.03;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      // ---------- Loop ----------
+      let last = performance.now();
+      function loop(now){
+        const dt = Math.min(0.033, (now - last) / 1000);
+        last = now;
+
+        update(dt);
+        render();
+
+        requestAnimationFrame(loop);
+      }
+
+      // ---------- Kickoff ----------
+      resize();
+      initSnow(true);
+      initDecor();
+      setOverlay("start");
+      setState("start");
+
+      requestAnimationFrame(loop);
+
+    })();
+  </script>
+</body>
+</html>
