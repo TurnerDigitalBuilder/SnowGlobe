@@ -476,9 +476,17 @@
         audio.master.connect(audio.ctx.destination);
       }
 
+      function ensureAudio(){
+        initAudio();
+        if(audio.ctx && audio.ctx.state === "suspended"){
+          // resume only requires a gesture on mobile; fire-and-forget
+          audio.ctx.resume();
+        }
+      }
+
       function playTone(freq, dur = 0.12, type = "sine", gain = 0.20){
         if(audio.muted) return;
-        initAudio();
+        ensureAudio();
         if(!audio.ctx || !audio.master) return;
 
         const t0 = audio.ctx.currentTime;
@@ -513,6 +521,46 @@
       function sfxShake(){
         playTone(220, 0.08, "square", 0.12);
         setTimeout(() => playTone(330, 0.09, "square", 0.09), 70);
+      }
+
+      function sfxJingle(){
+        if(audio.muted) return;
+        ensureAudio();
+        if(!audio.ctx || !audio.master) return;
+
+        const base = audio.ctx.currentTime + 0.04;
+        const notes = [
+          { t: 0.00, f: 1175.0 },
+          { t: 0.20, f: 1175.0 },
+          { t: 0.38, f: 1175.0 },
+          { t: 0.62, f: 880.0  },
+          { t: 0.82, f: 1046.5 },
+          { t: 1.06, f: 1175.0 }
+        ];
+
+        for(const n of notes){
+          const start = base + n.t;
+          const o = audio.ctx.createOscillator();
+          const g = audio.ctx.createGain();
+          const lpf = audio.ctx.createBiquadFilter();
+
+          o.type = "triangle";
+          o.frequency.setValueAtTime(n.f, start);
+
+          lpf.type = "lowpass";
+          lpf.frequency.setValueAtTime(1600, start);
+
+          g.gain.setValueAtTime(0.0001, start);
+          g.gain.exponentialRampToValueAtTime(0.30, start + 0.03);
+          g.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
+
+          o.connect(lpf);
+          lpf.connect(g);
+          g.connect(audio.master);
+
+          o.start(start);
+          o.stop(start + 0.35);
+        }
       }
 
       // ---------- Snow ----------
@@ -668,7 +716,7 @@
       }
 
       function startGame(){
-        initAudio(); // safe (only creates after gesture)
+        ensureAudio();
         score = 0;
         level = 1;
         timeLeft = 60;
@@ -688,6 +736,7 @@
         setState("running");
         hideOverlay();
         showToast("Collect the stars!");
+        sfxJingle();
       }
 
       function nextLevel(){
