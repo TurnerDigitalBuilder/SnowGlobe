@@ -10,6 +10,10 @@ A mobile-friendly snow globe mini-game. Open `index.html` in a modern browser to
 - **Sound toggle**: Turn audio feedback on or off.
 - **Festive start jingle**: A short sleigh-bell inspired chime celebrates each new run.
 
+## Scene and template
+- The globe now holds a winter town vignette: ringed evergreens, cozy houses, glowing lampposts, and a central Christmas tree wrapped in ornaments and gifts.
+- All visuals render directly in `index.html`—no external assets or build tools are required.
+
 ## Site flow
 1. The overlay card introduces the game and asks to start or enable tilt.
 2. Once running, the HUD shows score, timer, level, remaining stars, and bonus multiplier.
