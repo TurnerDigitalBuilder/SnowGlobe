@@ -41,15 +41,14 @@
     /* HUD */
     #hud{
       position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
-      padding: calc(env(safe-area-inset-top) + var(--pad)) var(--pad) var(--pad) var(--pad);
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
+      inset: 0;
       pointer-events: none;
+    }
+    #stats{
+      position: absolute;
+      left: calc(var(--pad) + env(safe-area-inset-left));
+      top: calc(var(--pad) + env(safe-area-inset-top));
+      pointer-events: auto;
     }
     .panel{
       pointer-events: auto;
@@ -84,8 +83,14 @@
       line-height: 1.1;
     }
     #controls{
+      position: absolute;
+      right: calc(var(--pad) + env(safe-area-inset-right));
+      bottom: calc(var(--pad) + env(safe-area-inset-bottom));
       display: grid;
       gap: 8px;
+      max-width: min(460px, calc(100vw - 2*var(--pad) - env(safe-area-inset-left) - env(safe-area-inset-right)));
+      width: 100%;
+      pointer-events: auto;
     }
     .btnrow{
       display: flex;
@@ -98,7 +103,7 @@
       border: 1px solid rgba(255,255,255,.18);
       background: rgba(255,255,255,.10);
       color: var(--ui-tx);
-      padding: 10px 12px;
+      padding: 10px 10px;
       border-radius: 12px;
       font-weight: 700;
       font-size: 13px;
@@ -227,18 +232,14 @@
 
     @media (max-width: 760px){
       :root{ --pad: 10px; }
-      #hud{
-        flex-direction: column;
-        align-items: stretch;
-        justify-content: flex-start;
-        pointer-events: none;
-        gap: 10px;
-      }
       .panel{ width: 100%; pointer-events: auto; }
       #stats{
         min-width: 0;
         padding: 8px 10px;
         background: rgba(0,0,0,.30);
+        width: calc(100% - 2*var(--pad) - env(safe-area-inset-left) - env(safe-area-inset-right));
+        max-width: 520px;
+        right: auto;
       }
       #stats .row{
         display: grid;
@@ -251,6 +252,7 @@
         max-width: 100%;
         padding: 8px 10px;
         background: rgba(0,0,0,.30);
+        width: calc(100% - 2*var(--pad) - env(safe-area-inset-left) - env(safe-area-inset-right));
       }
       #controls .btnrow{
         display: grid;
@@ -276,7 +278,7 @@
       .actions{ justify-content: center; width: 100%; }
       #joystick{ width: 128px; height: 128px; }
       button{
-        padding: 9px 10px;
+        padding: 9px 9px;
         font-size: 12px;
         min-height: 40px;
       }
@@ -288,7 +290,7 @@
       #joystick{ width: 120px; height: 120px; }
       #stick{ width: 50px; height: 50px; }
       .value{ font-size: 17px; }
-      button{ padding: 8px 10px; font-size: 11px; }
+      button{ padding: 8px 9px; font-size: 11px; }
     }
   </style>
 </head>
